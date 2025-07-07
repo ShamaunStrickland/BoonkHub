@@ -1,0 +1,235 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- GUI Setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BoonkHub"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 300)
+frame.Position = UDim2.new(0, 20, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner", frame)
+uiCorner.CornerRadius = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+title.Text = "🌀 BoonkHub ESP"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = frame
+
+local uiCornerTitle = Instance.new("UICorner", title)
+uiCornerTitle.CornerRadius = UDim.new(0, 8)
+
+local function createToggleButton(text, order)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -20, 0, 40)
+	btn.Position = UDim2.new(0, 10, 0, 40 + (order * 45))
+	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 16
+	btn.Text = text .. ": OFF"
+	btn.Parent = frame
+
+	local corner = Instance.new("UICorner", btn)
+	corner.CornerRadius = UDim.new(0, 6)
+
+	return btn
+end
+
+local trinketBtn = createToggleButton("Trinket ESP", 0)
+local spawnBtn = createToggleButton("Map Spawn ESP", 1)
+local playerBtn = createToggleButton("Player ESP", 2)
+local autoCollectBtn = createToggleButton("Auto Collect Trinkets", 3)
+
+-- States
+local trinketEnabled = false
+local spawnEnabled = false
+local playerEnabled = false
+local autoCollectEnabled = false
+
+local activeMarkers = {}
+local trackedObjects = {}
+
+-- Helper: create Billboard
+local function createBillboard(part, labelText, size, color)
+	local billboard = part:FindFirstChild("TempESP")
+	if not billboard then
+		billboard = Instance.new("BillboardGui")
+		billboard.Adornee = part
+		billboard.Size = UDim2.new(0, size or 120, 0, 30)
+		billboard.AlwaysOnTop = true
+		billboard.Name = "TempESP"
+		billboard.Parent = part
+
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, 0, 1, 0)
+		label.BackgroundTransparency = 1
+		label.Text = labelText
+		label.TextColor3 = color or Color3.new(1, 1, 1)
+		label.TextStrokeTransparency = 0.5
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBold
+		label.Name = "ESPLabel"
+		label.Parent = billboard
+	else
+		local label = billboard:FindFirstChild("ESPLabel")
+		if label then
+			label.Text = labelText
+		end
+	end
+end
+
+-- Trinket ESP
+local function trinketLoop()
+	RunService.RenderStepped:Connect(function()
+		if not trinketEnabled then return end
+
+		local trinketFolder = workspace:FindFirstChild("Game")
+			and workspace.Game:FindFirstChild("Trinkets")
+			and workspace.Game.Trinkets:FindFirstChild("Spawned")
+
+		if trinketFolder then
+			for _, trinket in ipairs(trinketFolder:GetChildren()) do
+				local mainPart = trinket:IsA("BasePart") and trinket or trinket:FindFirstChildWhichIsA("BasePart")
+				if mainPart then
+					local dist = (mainPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+					local labelText = string.format("%s | %.0fm", trinket.Name, dist)
+					createBillboard(mainPart, labelText, 150, Color3.fromRGB(0, 255, 0))
+				end
+			end
+		end
+	end)
+end
+
+-- Map Spawn ESP
+local function spawnLoop()
+	RunService.RenderStepped:Connect(function()
+		if not spawnEnabled then return end
+		for _, obj in ipairs(workspace:GetChildren()) do
+			if obj:IsA("Model") or obj:IsA("BasePart") then
+				if not Players:FindFirstChild(obj.Name) and not trackedObjects[obj] then
+					local mainPart = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
+					if mainPart then
+						createBillboard(mainPart, obj.Name .. " - Spawned", 120, Color3.fromRGB(255, 165, 0))
+						trackedObjects[obj] = true
+					end
+				end
+			end
+		end
+	end)
+end
+
+-- Player ESP
+local function playerLoop()
+	RunService.RenderStepped:Connect(function()
+		if not playerEnabled then return end
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and not plr.Character.HumanoidRootPart:FindFirstChild("TempESP") then
+				local dist = (plr.Character.HumanoidRootPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+				local hp = plr.Character:FindFirstChild("Humanoid") and math.floor(plr.Character.Humanoid.Health) or 0
+				local labelText = string.format("%s | %d HP | %.0fm", plr.Name, hp, dist)
+				createBillboard(plr.Character.HumanoidRootPart, labelText, 100, Color3.fromRGB(0, 200, 255))
+			end
+		end
+	end)
+end
+
+-- Auto Collect Trinkets
+local function autoCollectLoop()
+	task.spawn(function()
+		while task.wait(1) do
+			if not autoCollectEnabled then break end
+
+			local trinketFolder = workspace:FindFirstChild("Game")
+				and workspace.Game:FindFirstChild("Trinkets")
+				and workspace.Game.Trinkets:FindFirstChild("Spawned")
+
+			if trinketFolder then
+				for _, trinket in ipairs(trinketFolder:GetChildren()) do
+					local mainPart = trinket:IsA("BasePart") and trinket or trinket:FindFirstChildWhichIsA("BasePart")
+					if mainPart then
+						local char = LocalPlayer.Character
+						if char and char:FindFirstChild("HumanoidRootPart") then
+							char.HumanoidRootPart.CFrame = mainPart.CFrame + Vector3.new(0, 5, 0)
+						end
+
+						task.wait(0.5)
+
+						local yesButton = LocalPlayer:FindFirstChild("PlayerGui")
+							and LocalPlayer.PlayerGui:FindFirstChild("Artifact")
+							and LocalPlayer.PlayerGui.Artifact:FindFirstChild("main")
+							and LocalPlayer.PlayerGui.Artifact.main:FindFirstChild("yes")
+
+						if yesButton then
+							yesButton.MouseButton1Click:Fire()
+						end
+
+						task.wait(0.5)
+					end
+				end
+			end
+		end
+	end)
+end
+
+-- Clear function
+local function clearMarkers()
+	for _, marker in ipairs(activeMarkers) do
+		if marker and marker.Parent then
+			marker:Destroy()
+		end
+	end
+	activeMarkers = {}
+	trackedObjects = {}
+end
+
+-- Toggle logic
+local function toggleFunction(btn, stateName)
+	if stateName == "trinket" then
+		trinketEnabled = not trinketEnabled
+		btn.Text = "Trinket ESP: " .. (trinketEnabled and "ON" or "OFF")
+		if not trinketEnabled then clearMarkers() end
+	elseif stateName == "spawn" then
+		spawnEnabled = not spawnEnabled
+		btn.Text = "Map Spawn ESP: " .. (spawnEnabled and "ON" or "OFF")
+		if not spawnEnabled then clearMarkers() end
+	elseif stateName == "player" then
+		playerEnabled = not playerEnabled
+		btn.Text = "Player ESP: " .. (playerEnabled and "ON" or "OFF")
+		if not playerEnabled then clearMarkers() end
+	elseif stateName == "collect" then
+		autoCollectEnabled = not autoCollectEnabled
+		btn.Text = "Auto Collect Trinkets: " .. (autoCollectEnabled and "ON" or "OFF")
+		if autoCollectEnabled then
+			autoCollectLoop()
+		end
+	end
+
+	btn.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
+	wait(0.15)
+	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end
+
+-- Button events
+trinketBtn.MouseButton1Click:Connect(function() toggleFunction(trinketBtn, "trinket") end)
+spawnBtn.MouseButton1Click:Connect(function() toggleFunction(spawnBtn, "spawn") end)
+playerBtn.MouseButton1Click:Connect(function() toggleFunction(playerBtn, "player") end)
+autoCollectBtn.MouseButton1Click:Connect(function() toggleFunction(autoCollectBtn, "collect") end)
+
+-- Start ESP loops
+trinketLoop()
+spawnLoop()
+playerLoop()
