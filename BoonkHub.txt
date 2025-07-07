@@ -1,6 +1,17 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+
+local artifactRemote = ReplicatedStorage.Remotes.ClientToServer.Artifact
+local artifactEvent = artifactRemote.OnClientEvent
+
+local lastArtifact = nil
+
+artifactEvent:Connect(function(v3)
+	lastArtifact = v3
+end)
 
 -- GUI Setup
 local screenGui = Instance.new("ScreenGui")
@@ -12,13 +23,11 @@ local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 300, 0, 300)
 frame.Position = UDim2.new(0, 20, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
-local uiCorner = Instance.new("UICorner", frame)
-uiCorner.CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 40)
@@ -29,8 +38,7 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 20
 title.Parent = frame
 
-local uiCornerTitle = Instance.new("UICorner", title)
-uiCornerTitle.CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
 
 local function createToggleButton(text, order)
 	local btn = Instance.new("TextButton")
@@ -42,10 +50,7 @@ local function createToggleButton(text, order)
 	btn.TextSize = 16
 	btn.Text = text .. ": OFF"
 	btn.Parent = frame
-
-	local corner = Instance.new("UICorner", btn)
-	corner.CornerRadius = UDim.new(0, 6)
-
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 	return btn
 end
 
@@ -61,9 +66,9 @@ local playerEnabled = false
 local autoCollectEnabled = false
 
 local activeMarkers = {}
-local trackedObjects = {}
 
--- Helper: create Billboard
+local trinketConn, spawnConn, playerConn
+
 local function createBillboard(part, labelText, size, color)
 	local billboard = part:FindFirstChild("TempESP")
 	if not billboard then
@@ -84,6 +89,8 @@ local function createBillboard(part, labelText, size, color)
 		label.Font = Enum.Font.GothamBold
 		label.Name = "ESPLabel"
 		label.Parent = billboard
+
+		table.insert(activeMarkers, billboard)
 	else
 		local label = billboard:FindFirstChild("ESPLabel")
 		if label then
@@ -92,100 +99,6 @@ local function createBillboard(part, labelText, size, color)
 	end
 end
 
--- Trinket ESP
-local function trinketLoop()
-	RunService.RenderStepped:Connect(function()
-		if not trinketEnabled then return end
-
-		local trinketFolder = workspace:FindFirstChild("Game")
-			and workspace.Game:FindFirstChild("Trinkets")
-			and workspace.Game.Trinkets:FindFirstChild("Spawned")
-
-		if trinketFolder then
-			for _, trinket in ipairs(trinketFolder:GetChildren()) do
-				local mainPart = trinket:IsA("BasePart") and trinket or trinket:FindFirstChildWhichIsA("BasePart")
-				if mainPart then
-					local dist = (mainPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
-					local labelText = string.format("%s | %.0fm", trinket.Name, dist)
-					createBillboard(mainPart, labelText, 150, Color3.fromRGB(0, 255, 0))
-				end
-			end
-		end
-	end)
-end
-
--- Map Spawn ESP
-local function spawnLoop()
-	RunService.RenderStepped:Connect(function()
-		if not spawnEnabled then return end
-		for _, obj in ipairs(workspace:GetChildren()) do
-			if obj:IsA("Model") or obj:IsA("BasePart") then
-				if not Players:FindFirstChild(obj.Name) and not trackedObjects[obj] then
-					local mainPart = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
-					if mainPart then
-						createBillboard(mainPart, obj.Name .. " - Spawned", 120, Color3.fromRGB(255, 165, 0))
-						trackedObjects[obj] = true
-					end
-				end
-			end
-		end
-	end)
-end
-
--- Player ESP
-local function playerLoop()
-	RunService.RenderStepped:Connect(function()
-		if not playerEnabled then return end
-		for _, plr in ipairs(Players:GetPlayers()) do
-			if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and not plr.Character.HumanoidRootPart:FindFirstChild("TempESP") then
-				local dist = (plr.Character.HumanoidRootPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
-				local hp = plr.Character:FindFirstChild("Humanoid") and math.floor(plr.Character.Humanoid.Health) or 0
-				local labelText = string.format("%s | %d HP | %.0fm", plr.Name, hp, dist)
-				createBillboard(plr.Character.HumanoidRootPart, labelText, 100, Color3.fromRGB(0, 200, 255))
-			end
-		end
-	end)
-end
-
--- Auto Collect Trinkets
-local function autoCollectLoop()
-	task.spawn(function()
-		while task.wait(1) do
-			if not autoCollectEnabled then break end
-
-			local trinketFolder = workspace:FindFirstChild("Game")
-				and workspace.Game:FindFirstChild("Trinkets")
-				and workspace.Game.Trinkets:FindFirstChild("Spawned")
-
-			if trinketFolder then
-				for _, trinket in ipairs(trinketFolder:GetChildren()) do
-					local mainPart = trinket:IsA("BasePart") and trinket or trinket:FindFirstChildWhichIsA("BasePart")
-					if mainPart then
-						local char = LocalPlayer.Character
-						if char and char:FindFirstChild("HumanoidRootPart") then
-							char.HumanoidRootPart.CFrame = mainPart.CFrame + Vector3.new(0, 5, 0)
-						end
-
-						task.wait(0.5)
-
-						local yesButton = LocalPlayer:FindFirstChild("PlayerGui")
-							and LocalPlayer.PlayerGui:FindFirstChild("Artifact")
-							and LocalPlayer.PlayerGui.Artifact:FindFirstChild("main")
-							and LocalPlayer.PlayerGui.Artifact.main:FindFirstChild("yes")
-
-						if yesButton then
-							yesButton.MouseButton1Click:Fire()
-						end
-
-						task.wait(0.5)
-					end
-				end
-			end
-		end
-	end)
-end
-
--- Clear function
 local function clearMarkers()
 	for _, marker in ipairs(activeMarkers) do
 		if marker and marker.Parent then
@@ -193,43 +106,107 @@ local function clearMarkers()
 		end
 	end
 	activeMarkers = {}
-	trackedObjects = {}
 end
 
--- Toggle logic
-local function toggleFunction(btn, stateName)
-	if stateName == "trinket" then
-		trinketEnabled = not trinketEnabled
-		btn.Text = "Trinket ESP: " .. (trinketEnabled and "ON" or "OFF")
-		if not trinketEnabled then clearMarkers() end
-	elseif stateName == "spawn" then
-		spawnEnabled = not spawnEnabled
-		btn.Text = "Map Spawn ESP: " .. (spawnEnabled and "ON" or "OFF")
-		if not spawnEnabled then clearMarkers() end
-	elseif stateName == "player" then
-		playerEnabled = not playerEnabled
-		btn.Text = "Player ESP: " .. (playerEnabled and "ON" or "OFF")
-		if not playerEnabled then clearMarkers() end
-	elseif stateName == "collect" then
-		autoCollectEnabled = not autoCollectEnabled
-		btn.Text = "Auto Collect Trinkets: " .. (autoCollectEnabled and "ON" or "OFF")
-		if autoCollectEnabled then
-			autoCollectLoop()
-		end
-	end
+local function toggleTrinket()
+	trinketEnabled = not trinketEnabled
+	trinketBtn.Text = "Trinket ESP: " .. (trinketEnabled and "ON" or "OFF")
+	if trinketConn then trinketConn:Disconnect() end
+	if not trinketEnabled then clearMarkers() return end
 
-	btn.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
-	wait(0.15)
-	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	trinketConn = RunService.RenderStepped:Connect(function()
+		local folder = workspace:FindFirstChild("Game")
+			and workspace.Game:FindFirstChild("Trinkets")
+			and workspace.Game.Trinkets:FindFirstChild("Spawned")
+		if folder then
+			for _, trinket in ipairs(folder:GetChildren()) do
+				local mainPart = trinket:IsA("BasePart") and trinket or trinket:FindFirstChildWhichIsA("BasePart")
+				if mainPart and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+					local dist = (mainPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+					createBillboard(mainPart, string.format("%s | %.0fm", trinket.Name, dist), 150, Color3.fromRGB(0, 255, 0))
+				end
+			end
+		end
+	end)
+end
+
+local function toggleSpawn()
+	spawnEnabled = not spawnEnabled
+	spawnBtn.Text = "Map Spawn ESP: " .. (spawnEnabled and "ON" or "OFF")
+	if spawnConn then spawnConn:Disconnect() end
+	if not spawnEnabled then clearMarkers() return end
+
+	spawnConn = RunService.RenderStepped:Connect(function()
+		for _, obj in ipairs(workspace:GetChildren()) do
+			if (obj:IsA("Model") or obj:IsA("BasePart")) and not Players:FindFirstChild(obj.Name) then
+				local mainPart = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
+				if mainPart then
+					createBillboard(mainPart, obj.Name .. " - Spawned", 120, Color3.fromRGB(255, 165, 0))
+				end
+			end
+		end
+	end)
+end
+
+local function togglePlayer()
+	playerEnabled = not playerEnabled
+	playerBtn.Text = "Player ESP: " .. (playerEnabled and "ON" or "OFF")
+	if playerConn then playerConn:Disconnect() end
+	if not playerEnabled then clearMarkers() return end
+
+	playerConn = RunService.RenderStepped:Connect(function()
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+				local dist = (plr.Character.HumanoidRootPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+				local hp = plr.Character:FindFirstChild("Humanoid") and math.floor(plr.Character.Humanoid.Health) or 0
+				createBillboard(plr.Character.HumanoidRootPart, string.format("%s | %d HP | %.0fm", plr.Name, hp, dist), 100, Color3.fromRGB(0, 200, 255))
+			end
+		end
+	end)
+end
+
+local function toggleAutoCollect()
+	autoCollectEnabled = not autoCollectEnabled
+	autoCollectBtn.Text = "Auto Collect Trinkets: " .. (autoCollectEnabled and "ON" or "OFF")
+
+	if autoCollectEnabled then
+		task.spawn(function()
+			while autoCollectEnabled do
+				local folder = workspace:FindFirstChild("Game")
+					and workspace.Game:FindFirstChild("Trinkets")
+					and workspace.Game.Trinkets:FindFirstChild("Spawned")
+				if folder then
+					for _, trinket in ipairs(folder:GetChildren()) do
+						local mainPart = trinket:IsA("BasePart") and trinket or trinket:FindFirstChildWhichIsA("BasePart")
+						if mainPart and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+							LocalPlayer.Character.HumanoidRootPart.CFrame = mainPart.CFrame + Vector3.new(0, 5, 0)
+							task.wait(0.5)
+
+							if lastArtifact then
+								artifactRemote:FireServer("Accept", lastArtifact)
+								lastArtifact = nil
+							end
+
+							task.wait(0.5)
+						end
+					end
+				end
+				task.wait(1)
+			end
+		end)
+	end
 end
 
 -- Button events
-trinketBtn.MouseButton1Click:Connect(function() toggleFunction(trinketBtn, "trinket") end)
-spawnBtn.MouseButton1Click:Connect(function() toggleFunction(spawnBtn, "spawn") end)
-playerBtn.MouseButton1Click:Connect(function() toggleFunction(playerBtn, "player") end)
-autoCollectBtn.MouseButton1Click:Connect(function() toggleFunction(autoCollectBtn, "collect") end)
+trinketBtn.MouseButton1Click:Connect(toggleTrinket)
+spawnBtn.MouseButton1Click:Connect(toggleSpawn)
+playerBtn.MouseButton1Click:Connect(togglePlayer)
+autoCollectBtn.MouseButton1Click:Connect(toggleAutoCollect)
 
--- Start ESP loops
-trinketLoop()
-spawnLoop()
-playerLoop()
+-- Bind "-" key to hide/show GUI
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.Minus then
+		frame.Visible = not frame.Visible
+	end
+end)
