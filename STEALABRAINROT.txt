@@ -1,0 +1,433 @@
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "BookHubBR"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 600, 0, 500)
+frame.Position = UDim2.new(0.5, -300, 0.5, -250)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+-- Sidebar Tabs
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(0, 150, 1, 0)
+tabBar.Position = UDim2.new(0, 0, 0, 0)
+tabBar.BackgroundColor3 = Color3.fromRGB(30,30,30)
+tabBar.Parent = frame
+Instance.new("UICorner", tabBar).CornerRadius = UDim.new(0, 6)
+
+local function createTabButton(name, posY)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -20, 0, 50)
+	btn.Position = UDim2.new(0, 10, 0, posY)
+	btn.Text = name
+	btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.Font = Enum.Font.SourceSans
+	btn.TextScaled = true
+	btn.Parent = tabBar
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+	return btn
+end
+
+local autoFarmTab = createTabButton("Auto Farm Coins", 20)
+local autoGrabTab = createTabButton("Auto Grab", 80)
+local stealFarmTab = createTabButton("Steal Farm", 140)
+local shopTab = createTabButton("Shop", 200)
+
+-- Content Frames
+local contentWidth = UDim2.new(0, 430, 1, -20)
+
+local function createContentFrame()
+	local f = Instance.new("Frame")
+	f.Size = contentWidth
+	f.Position = UDim2.new(0, 160, 0, 10)
+	f.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	f.Visible = false
+	f.Parent = frame
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+	return f
+end
+
+local autoFarmFrame = createContentFrame()
+local autoGrabFrame = createContentFrame()
+local stealFarmFrame = createContentFrame()
+local shopFrame = createContentFrame()
+
+local function showFrame(selected)
+	autoFarmFrame.Visible = (selected == autoFarmFrame)
+	autoGrabFrame.Visible = (selected == autoGrabFrame)
+	stealFarmFrame.Visible = (selected == stealFarmFrame)
+	shopFrame.Visible = (selected == shopFrame)
+end
+
+autoFarmTab.MouseButton1Click:Connect(function() showFrame(autoFarmFrame) end)
+autoGrabTab.MouseButton1Click:Connect(function() showFrame(autoGrabFrame) end)
+stealFarmTab.MouseButton1Click:Connect(function() showFrame(stealFarmFrame) end)
+shopTab.MouseButton1Click:Connect(function() showFrame(shopFrame) end)
+
+--// --- Auto Farm Coins ---
+local claimButton = Instance.new("TextButton")
+claimButton.Size = UDim2.new(1, -20, 0, 50)
+claimButton.Position = UDim2.new(0, 10, 0, 20)
+claimButton.Text = "Start Auto Farm Coins"
+claimButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
+claimButton.TextColor3 = Color3.fromRGB(255,255,255)
+claimButton.Font = Enum.Font.SourceSans
+claimButton.TextScaled = true
+claimButton.Parent = autoFarmFrame
+Instance.new("UICorner", claimButton).CornerRadius = UDim.new(0, 6)
+
+local claimRunning = false
+local function claimLoop()
+	while claimRunning do
+		for i = 1, 18 do
+			ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net"):WaitForChild("RE/PlotService/ClaimCoins"):FireServer(i)
+			task.wait(0.1)
+		end
+	end
+end
+claimButton.MouseButton1Click:Connect(function()
+	claimRunning = not claimRunning
+	claimButton.Text = claimRunning and "Stop Auto Farm Coins" or "Start Auto Farm Coins"
+	if claimRunning then task.spawn(claimLoop) end
+end)
+
+--// --- Auto Grab ---
+local walkButton = Instance.new("TextButton")
+walkButton.Size = UDim2.new(1, -20, 0, 50)
+walkButton.Position = UDim2.new(0, 10, 0, 20)
+walkButton.Text = "Start Auto Grab"
+walkButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
+walkButton.TextColor3 = Color3.fromRGB(255,255,255)
+walkButton.Font = Enum.Font.SourceSans
+walkButton.TextScaled = true
+walkButton.Parent = autoGrabFrame
+Instance.new("UICorner", walkButton).CornerRadius = UDim.new(0, 6)
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, -20, 0, 20)
+speedLabel.Position = UDim2.new(0, 10, 0, 80)
+speedLabel.Text = "Walk Speed: 1.0"
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.fromRGB(255,255,255)
+speedLabel.TextScaled = true
+speedLabel.Parent = autoGrabFrame
+
+local speedSlider = Instance.new("TextBox")
+speedSlider.Size = UDim2.new(1, -20, 0, 30)
+speedSlider.Position = UDim2.new(0, 10, 0, 110)
+speedSlider.Text = "1.0"
+speedSlider.BackgroundColor3 = Color3.fromRGB(60,60,60)
+speedSlider.TextColor3 = Color3.fromRGB(255,255,255)
+speedSlider.TextScaled = true
+speedSlider.ClearTextOnFocus = false
+speedSlider.Parent = autoGrabFrame
+Instance.new("UICorner", speedSlider).CornerRadius = UDim.new(0, 6)
+
+local refreshButton = Instance.new("TextButton")
+refreshButton.Size = UDim2.new(1, -20, 0, 30)
+refreshButton.Position = UDim2.new(0, 10, 0, 150)
+refreshButton.Text = "Refresh Plots"
+refreshButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
+refreshButton.TextColor3 = Color3.fromRGB(255,255,255)
+refreshButton.TextScaled = true
+refreshButton.Parent = autoGrabFrame
+Instance.new("UICorner", refreshButton).CornerRadius = UDim.new(0, 6)
+
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -20, 0, 200)
+scrollFrame.Position = UDim2.new(0, 10, 0, 190)
+scrollFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.Parent = autoGrabFrame
+Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 6)
+
+local walkRunning, walkSpeed = false, 1.0
+local selectedPlotGUID = nil
+
+speedSlider.FocusLost:Connect(function()
+	local v = tonumber(speedSlider.Text)
+	if v and v >= 0.1 and v <= 5 then
+		walkSpeed = v
+		speedLabel.Text = ("Walk Speed: %.1f"):format(walkSpeed)
+	else speedSlider.Text = tostring(walkSpeed) end
+end)
+
+local function findFirstPartRecursive(model)
+	for _, d in ipairs(model:GetDescendants()) do if d:IsA("BasePart") then return d end end
+end
+
+local function walkLoop()
+	while walkRunning do
+		local plot = selectedPlotGUID and workspace.Plots:FindFirstChild(selectedPlotGUID)
+		if plot and plot:FindFirstChild("AnimalPodiums") then
+			for i = 1, 18 do
+				if not walkRunning then break end
+				local podium = plot.AnimalPodiums:FindFirstChild(tostring(i))
+				local part = podium and (podium.PrimaryPart or findFirstPartRecursive(podium))
+				if part then
+					humanoid:MoveTo(part.Position + Vector3.new(0,3,0))
+					humanoid.MoveToFinished:Wait()
+					task.wait(3)
+				end
+			end
+		else warn("No valid plot") task.wait(1) end
+	end
+end
+
+walkButton.MouseButton1Click:Connect(function()
+	walkRunning = not walkRunning
+	walkButton.Text = walkRunning and "Stop Auto Grab" or "Start Auto Grab"
+	if walkRunning then task.spawn(walkLoop) end
+end)
+
+local function ScanPlots()
+	for _, c in ipairs(scrollFrame:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+	local y = 0
+	for _, plot in ipairs(workspace.Plots:GetChildren()) do
+		local owner = plot:FindFirstChild("PlotSign") and plot.PlotSign.SurfaceGui.Frame.TextLabel.Text or "Unknown"
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(1, -4, 0, 30)
+		btn.Position = UDim2.new(0, 2, 0, y)
+		btn.Text = owner .. " : " .. plot.Name
+		btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+		btn.TextColor3 = Color3.new(1,1,1)
+		btn.Parent = scrollFrame
+		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+		btn.MouseButton1Click:Connect(function() selectedPlotGUID = plot.Name end)
+		y = y + 32
+	end
+	scrollFrame.CanvasSize = UDim2.new(0,0,0,y)
+end
+refreshButton.MouseButton1Click:Connect(ScanPlots)
+ScanPlots()
+
+-- NOW: Steal Farm & Shop will be FULLY INCLUDED below...
+local stealToggle = Instance.new("TextButton")
+stealToggle.Size = UDim2.new(1, -20, 0, 50)
+stealToggle.Position = UDim2.new(0, 10, 0, 20)
+stealToggle.Text = "Start Steal Farm"
+stealToggle.BackgroundColor3 = Color3.fromRGB(70,70,70)
+stealToggle.TextColor3 = Color3.fromRGB(255,255,255)
+stealToggle.TextScaled = true
+stealToggle.Font = Enum.Font.SourceSans
+stealToggle.Parent = stealFarmFrame
+Instance.new("UICorner", stealToggle).CornerRadius = UDim.new(0, 6)
+
+local precisionScroll = Instance.new("ScrollingFrame")
+precisionScroll.Size = UDim2.new(1, -20, 0, 380)
+precisionScroll.Position = UDim2.new(0, 10, 0, 80)
+precisionScroll.BackgroundColor3 = Color3.fromRGB(30,30,30)
+precisionScroll.ScrollBarThickness = 6
+precisionScroll.Parent = stealFarmFrame
+Instance.new("UICorner", precisionScroll).CornerRadius = UDim.new(0, 6)
+
+local precisionRunning = false
+local selectedPrecisionPlot = nil
+local selectedPrecisionPodium = nil
+
+local function TweenToPosition(destination, tweenTime)
+	hrp.Anchored = true
+	local goal = { CFrame = CFrame.new(destination) }
+	local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
+	local tween = TweenService:Create(hrp, tweenInfo, goal)
+	tween:Play()
+	tween.Completed:Connect(function() end)
+end
+
+local function precisionTweenLoop()
+	while precisionRunning do
+		local plot = workspace.Plots:FindFirstChild(selectedPrecisionPlot)
+		local podium = plot and plot:FindFirstChild("AnimalPodiums") and plot.AnimalPodiums:FindFirstChild(tostring(selectedPrecisionPodium))
+		if plot and podium then
+			local function findPart(m)
+				for _, d in ipairs(m:GetDescendants()) do
+					if d:IsA("BasePart") then return d end
+				end
+			end
+			local part = podium.PrimaryPart or findPart(podium)
+			if part then
+				local destination = part.Position + Vector3.new(0, 5, 0)
+				TweenToPosition(destination, 1)
+			else
+				warn("No BasePart found in podium")
+			end
+		else
+			warn("Invalid plot or podium")
+		end
+		task.wait(1)
+	end
+	hrp.Anchored = false
+end
+
+stealToggle.MouseButton1Click:Connect(function()
+	if not selectedPrecisionPlot or not selectedPrecisionPodium then
+		warn("No plot/podium selected")
+		return
+	end
+	precisionRunning = not precisionRunning
+	stealToggle.Text = precisionRunning and "Stop Steal Farm" or "Start Steal Farm"
+	if precisionRunning then task.spawn(precisionTweenLoop) end
+end)
+
+local function buildPrecision()
+	for _, f in ipairs(precisionScroll:GetChildren()) do
+		if not f:IsA("UIListLayout") then f:Destroy() end
+	end
+	local layout = Instance.new("UIListLayout")
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 4)
+	layout.Parent = precisionScroll
+
+	for _, plot in ipairs(workspace.Plots:GetChildren()) do
+		local owner = plot:FindFirstChild("PlotSign") and plot.PlotSign.SurfaceGui.Frame.TextLabel.Text or "Unknown"
+		local plotFrame = Instance.new("Frame")
+		plotFrame.Size = UDim2.new(1, -4, 0, 0)
+		plotFrame.BackgroundTransparency = 1
+		plotFrame.AutomaticSize = Enum.AutomaticSize.Y
+		plotFrame.Parent = precisionScroll
+
+		local innerLayout = Instance.new("UIListLayout")
+		innerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		innerLayout.Parent = plotFrame
+
+		local header = Instance.new("TextButton")
+		header.Size = UDim2.new(1, 0, 0, 30)
+		header.Text = owner.." : "..plot.Name
+		header.BackgroundColor3 = Color3.fromRGB(60,60,60)
+		header.TextColor3 = Color3.new(1,1,1)
+		header.Font = Enum.Font.SourceSans
+		header.TextScaled = true
+		header.Parent = plotFrame
+		Instance.new("UICorner", header).CornerRadius = UDim.new(0, 6)
+
+		local podiumsFrame = Instance.new("Frame")
+		podiumsFrame.Size = UDim2.new(1, 0, 0, 0)
+		podiumsFrame.BackgroundTransparency = 1
+		podiumsFrame.ClipsDescendants = true
+		podiumsFrame.AutomaticSize = Enum.AutomaticSize.Y
+		podiumsFrame.Parent = plotFrame
+
+		local podiumLayout = Instance.new("UIListLayout")
+		podiumLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		podiumLayout.Padding = UDim.new(0, 2)
+		podiumLayout.Parent = podiumsFrame
+
+		local open = false
+		header.MouseButton1Click:Connect(function()
+			open = not open
+			for _, child in ipairs(podiumsFrame:GetChildren()) do
+				if child:IsA("TextButton") then
+					child.Visible = open
+				end
+			end
+		end)
+
+		for i = 1, 18 do
+			local b = Instance.new("TextButton")
+			b.Size = UDim2.new(1, 0, 0, 30)
+			b.Text = "Podium "..i
+			b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+			b.TextColor3 = Color3.new(1,1,1)
+			b.Font = Enum.Font.SourceSans
+			b.TextScaled = true
+			b.Visible = false
+			b.Parent = podiumsFrame
+
+			b.MouseButton1Click:Connect(function()
+				selectedPrecisionPlot = plot.Name
+				selectedPrecisionPodium = i
+				print("Steal Target:", selectedPrecisionPlot, selectedPrecisionPodium)
+			end)
+		end
+	end
+end
+buildPrecision()
+
+--// --- Shop ---
+local shopLabel = Instance.new("TextLabel")
+shopLabel.Size = UDim2.new(1, -20, 0, 30)
+shopLabel.Position = UDim2.new(0, 10, 0, 10)
+shopLabel.Text = "Items"
+shopLabel.BackgroundTransparency = 1
+shopLabel.TextColor3 = Color3.fromRGB(255,255,255)
+shopLabel.TextScaled = true
+shopLabel.Font = Enum.Font.SourceSansBold
+shopLabel.Parent = shopFrame
+
+local itemsHeader = Instance.new("TextButton")
+itemsHeader.Size = UDim2.new(1, -20, 0, 30)
+itemsHeader.Position = UDim2.new(0, 10, 0, 50)
+itemsHeader.Text = "Items ▼"
+itemsHeader.BackgroundColor3 = Color3.fromRGB(60,60,60)
+itemsHeader.TextColor3 = Color3.new(1,1,1)
+itemsHeader.Font = Enum.Font.SourceSans
+itemsHeader.TextScaled = true
+itemsHeader.Parent = shopFrame
+Instance.new("UICorner", itemsHeader).CornerRadius = UDim.new(0, 6)
+
+local itemsScroll = Instance.new("ScrollingFrame")
+itemsScroll.Size = UDim2.new(1, -20, 0, 350)
+itemsScroll.Position = UDim2.new(0, 10, 0, 90)
+itemsScroll.BackgroundColor3 = Color3.fromRGB(30,30,30)
+itemsScroll.BorderSizePixel = 0
+itemsScroll.ScrollBarThickness = 6
+itemsScroll.ClipsDescendants = true
+itemsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+itemsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+itemsScroll.Visible = false
+itemsScroll.Parent = shopFrame
+Instance.new("UICorner", itemsScroll).CornerRadius = UDim.new(0, 6)
+
+local itemsLayout = Instance.new("UIListLayout")
+itemsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+itemsLayout.Padding = UDim.new(0, 2)
+itemsLayout.Parent = itemsScroll
+
+local open = false
+
+itemsHeader.MouseButton1Click:Connect(function()
+	open = not open
+	itemsHeader.Text = open and "Items ▲" or "Items ▼"
+	itemsScroll.Visible = open
+end)
+
+for _, item in ipairs(ReplicatedStorage:WaitForChild("Items"):GetChildren()) do
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1, 0, 0, 30)
+	b.Text = item.Name
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.SourceSans
+	b.TextScaled = true
+	b.Parent = itemsScroll
+
+	b.MouseButton1Click:Connect(function()
+		local args = { item.Name }
+		ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net"):WaitForChild("RF/CoinsShopService/RequestBuy"):InvokeServer(unpack(args))
+		print("Requested to buy:", item.Name)
+	end)
+end
+
+--// --- Minimize with "-"
+UserInputService.InputBegan:Connect(function(i,gp) if gp then return end if i.KeyCode == Enum.KeyCode.Minus then frame.Visible = not frame.Visible end end)
+
+showFrame(autoFarmFrame)
+
