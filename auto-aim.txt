@@ -28,7 +28,9 @@ gui.Name = "FaceLockGui"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
-player:WaitForChild("PlayerGui"):ClearAllChildren()
+if player:FindFirstChild("PlayerGui"):FindFirstChild("FaceLockGui") then
+    player.PlayerGui.FaceLockGui:Destroy()
+end
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
