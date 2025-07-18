@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -9,235 +10,263 @@ local camera = workspace.CurrentCamera
 repeat task.wait() until player:FindFirstChild("PlayerGui")
 repeat task.wait() until player.Character or player.CharacterAdded:Wait()
 
+--// Globals
+local lockOnEnabled = false
+local hotkeyLockEnabled = false
+local guiMinimized = false
+local targetPlayer = nil
+local highlightColor = Color3.fromRGB(0, 255, 170)
+local LOCK_HOTKEY = Enum.KeyCode.E
+local MINIMIZE_HOTKEY = Enum.KeyCode.M
+local awaitingHotkey = false
+local awaitingMinimizeHotkey = false
+
 local function getHRP(char)
 	return char and char:FindFirstChild("HumanoidRootPart")
 end
 
---// Globals
-local lockOnEnabled = false
-local hotkeyLockEnabled = false
-local targetPlayer = nil
-local highlightColor = Color3.fromRGB(255, 0, 0)
-local LOCK_HOTKEY = Enum.KeyCode.E
-local awaitingHotkey = false
-
---// UI Setup
+--// UI
 local gui = Instance.new("ScreenGui")
-
 gui.Name = "FaceLockGui"
-gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
-
-if player:FindFirstChild("PlayerGui"):FindFirstChild("FaceLockGui") then
-    player.PlayerGui.FaceLockGui:Destroy()
-end
+gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 470)
-mainFrame.Position = UDim2.new(0.5, -160, 0.1, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.ZIndex = 10
-mainFrame.Parent = gui
+local window = Instance.new("Frame")
+window.Size = UDim2.new(0, 350, 0, 450)
+window.Position = UDim2.new(0.5, -175, 0.1, 0)
+window.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+window.BorderSizePixel = 0
+window.Active = true
+window.Draggable = true
+window.Parent = gui
 
-local tabButtonsFrame = Instance.new("Frame")
-tabButtonsFrame.Name = "TabButtons"
-tabButtonsFrame.Size = UDim2.new(1, 0, 0, 40)
-tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-tabButtonsFrame.ZIndex = 11
-tabButtonsFrame.Parent = mainFrame
+local corner = Instance.new("UICorner", window)
+corner.CornerRadius = UDim.new(0, 10)
 
-local contentFrame = Instance.new("Frame")
-contentFrame.Name = "ContentFrame"
-contentFrame.Size = UDim2.new(1, 0, 1, -40)
-contentFrame.Position = UDim2.new(0, 0, 0, 40)
-contentFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-contentFrame.ClipsDescendants = true
-contentFrame.ZIndex = 11
-contentFrame.Parent = mainFrame
+local tabButtons = Instance.new("Frame")
+tabButtons.Size = UDim2.new(1, 0, 0, 40)
+tabButtons.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+tabButtons.Parent = window
+
+local tabHolder = Instance.new("Frame")
+tabHolder.Size = UDim2.new(1, 0, 1, -40)
+tabHolder.Position = UDim2.new(0, 0, 0, 40)
+tabHolder.BackgroundTransparency = 1
+tabHolder.ClipsDescendants = true
+tabHolder.Parent = window
 
 local playerTab = Instance.new("Frame")
-playerTab.Name = "PlayerTab"
 playerTab.Size = UDim2.new(1, 0, 1, 0)
+playerTab.Visible = true
 playerTab.BackgroundTransparency = 1
-playerTab.Visible = true
-playerTab.Visible = true
-playerTab.ZIndex = 12
-playerTab.Parent = contentFrame
+playerTab.Name = "Players"
+playerTab.Parent = tabHolder
 
-local playerList = Instance.new("ScrollingFrame")
-playerList.Name = "PlayerList"
-playerList.Size = UDim2.new(1, -20, 1, -120)
-playerList.Position = UDim2.new(0, 10, 0, 10)
-playerList.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-playerList.BorderSizePixel = 0
-playerList.ScrollBarThickness = 8
-playerList.CanvasSize = UDim2.new()
-playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-playerList.ZIndex = 13
-playerList.Parent = playerTab
+local settingsTab = Instance.new("Frame")
+settingsTab.Size = UDim2.new(1, 0, 1, 0)
+settingsTab.Visible = false
+settingsTab.BackgroundTransparency = 1
+settingsTab.Name = "Settings"
+settingsTab.Parent = tabHolder
 
-local layout = Instance.new("UIListLayout")
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Padding = UDim.new(0, 4)
-layout.Parent = playerList
+local function createTabButton(name, tab)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 100, 0, 30)
+	btn.Position = UDim2.new(0, #tabButtons:GetChildren() * 110, 0, 5)
+	btn.Text = name
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Parent = tabButtons
 
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 100, 0, 32)
-toggleButton.Position = UDim2.new(0, 10, 0, 340)
-toggleButton.Text = "Toggle: OFF"
-toggleButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleButton.ZIndex = 14
-toggleButton.Visible = true
-toggleButton.Parent = playerTab
+	local c = Instance.new("UICorner", btn)
 
-local hotkeyLabel = Instance.new("TextLabel")
-hotkeyLabel.Size = UDim2.new(0, 100, 0, 32)
-hotkeyLabel.Position = UDim2.new(0, 120, 0, 340)
-hotkeyLabel.Text = "Hotkey: [E]"
-hotkeyLabel.BackgroundTransparency = 1
-hotkeyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-hotkeyLabel.ZIndex = 14
-hotkeyLabel.Visible = true
-hotkeyLabel.Parent = playerTab
+	btn.MouseButton1Click:Connect(function()
+		for _, child in ipairs(tabHolder:GetChildren()) do
+			child.Visible = false
+		end
+		tab.Visible = true
+	end)
+end
 
-local setHotkeyButton = Instance.new("TextButton")
-setHotkeyButton.Size = UDim2.new(0, 80, 0, 32)
-setHotkeyButton.Position = UDim2.new(0, 230, 0, 340)
-setHotkeyButton.Text = "Set Hotkey"
-setHotkeyButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-setHotkeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-setHotkeyButton.ZIndex = 14
-setHotkeyButton.Visible = true
-setHotkeyButton.Parent = playerTab
+createTabButton("Players", playerTab)
+createTabButton("Settings", settingsTab)
 
---// Search & Status
-
+-- Players Tab UI
 local searchBox = Instance.new("TextBox")
+searchBox.PlaceholderText = "Search Player..."
 searchBox.Size = UDim2.new(1, -20, 0, 30)
 searchBox.Position = UDim2.new(0, 10, 0, 10)
-searchBox.PlaceholderText = "Type player name..."
-searchBox.Text = ""
-searchBox.ZIndex = 14
 searchBox.Parent = playerTab
 
 local searchButton = Instance.new("TextButton")
+searchButton.Text = "Search"
 searchButton.Size = UDim2.new(1, -20, 0, 30)
 searchButton.Position = UDim2.new(0, 10, 0, 50)
-searchButton.Text = "Search"
-searchButton.ZIndex = 14
-searchButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
-searchButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+searchButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+searchButton.TextColor3 = Color3.new(1,1,1)
 searchButton.Parent = playerTab
 
 local statusLabel = Instance.new("TextLabel")
+statusLabel.Text = "Status: Idle"
 statusLabel.Size = UDim2.new(1, -20, 0, 20)
 statusLabel.Position = UDim2.new(0, 10, 0, 90)
-statusLabel.Text = "Status: Idle"
-statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.new(1,1,1)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.ZIndex = 14
 statusLabel.Parent = playerTab
 
-searchButton.MouseButton1Click:Connect(function()
-	local inputName = searchBox.Text:lower()
-	local found = false
+local listFrame = Instance.new("ScrollingFrame")
+listFrame.Size = UDim2.new(1, -20, 0, 220)
+listFrame.Position = UDim2.new(0, 10, 0, 120)
+listFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+listFrame.ScrollBarThickness = 6
+listFrame.CanvasSize = UDim2.new()
+listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+listFrame.Parent = playerTab
 
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Name:lower():sub(1, #inputName) == inputName then
-			if targetPlayer then removeHighlight(targetPlayer.Character) end
-			targetPlayer = plr
-			addHighlight(plr.Character)
-			statusLabel.Text = "Status: Selected by search: " .. plr.Name
-			found = true
-			break
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 4)
+listLayout.Parent = listFrame
+
+local refreshButton = Instance.new("TextButton")
+refreshButton.Text = "Refresh"
+refreshButton.Size = UDim2.new(0.5, -15, 0, 30)
+refreshButton.Position = UDim2.new(0, 10, 0, 350)
+refreshButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+refreshButton.TextColor3 = Color3.new(1,1,1)
+refreshButton.Parent = playerTab
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Text = "Toggle: OFF"
+toggleButton.Size = UDim2.new(0.5, -15, 0, 30)
+toggleButton.Position = UDim2.new(0.5, 5, 0, 350)
+toggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+toggleButton.TextColor3 = Color3.new(1,1,1)
+toggleButton.Parent = playerTab
+
+-- Settings Tab UI
+local hotkeyLabel = Instance.new("TextLabel")
+hotkeyLabel.Text = "Hotkey: [E]"
+hotkeyLabel.Position = UDim2.new(0, 10, 0, 20)
+hotkeyLabel.Size = UDim2.new(0, 200, 0, 30)
+hotkeyLabel.BackgroundTransparency = 1
+hotkeyLabel.TextColor3 = Color3.fromRGB(255,255,255)
+hotkeyLabel.Parent = settingsTab
+
+local setHotkeyButton = Instance.new("TextButton")
+setHotkeyButton.Text = "Set Hotkey"
+setHotkeyButton.Size = UDim2.new(0, 120, 0, 30)
+setHotkeyButton.Position = UDim2.new(0, 10, 0, 60)
+setHotkeyButton.BackgroundColor3 = Color3.fromRGB(90, 90, 255)
+setHotkeyButton.TextColor3 = Color3.new(1,1,1)
+setHotkeyButton.Parent = settingsTab
+
+local minimizeHotkeyLabel = Instance.new("TextLabel")
+minimizeHotkeyLabel.Text = "Minimize Hotkey: [M]"
+minimizeHotkeyLabel.Position = UDim2.new(0, 10, 0, 110)
+minimizeHotkeyLabel.Size = UDim2.new(0, 200, 0, 30)
+minimizeHotkeyLabel.BackgroundTransparency = 1
+minimizeHotkeyLabel.TextColor3 = Color3.fromRGB(255,255,255)
+minimizeHotkeyLabel.Parent = settingsTab
+
+local setMinimizeHotkeyButton = Instance.new("TextButton")
+setMinimizeHotkeyButton.Text = "Set Minimize Hotkey"
+setMinimizeHotkeyButton.Size = UDim2.new(0, 160, 0, 30)
+setMinimizeHotkeyButton.Position = UDim2.new(0, 10, 0, 150)
+setMinimizeHotkeyButton.BackgroundColor3 = Color3.fromRGB(90, 90, 255)
+setMinimizeHotkeyButton.TextColor3 = Color3.new(1,1,1)
+setMinimizeHotkeyButton.Parent = settingsTab
+
+-- Logic functions for highlight and list
+local function addHighlight(char)
+	if not char:FindFirstChild("Highlight") then
+		local hl = Instance.new("Highlight")
+		hl.Name = "Highlight"
+		hl.Adornee = char
+		hl.FillColor = Color3.new(0, 0, 0)
+		hl.OutlineColor = highlightColor
+		hl.Parent = char
+	end
+end
+
+local function removeHighlight(char)
+	if char and char:FindFirstChild("Highlight") then
+		char.Highlight:Destroy()
+	end
+end
+
+local function updatePlayerList()
+	for _, child in ipairs(listFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
 		end
 	end
 
-	if not found then
-		statusLabel.Text = "Status: Player not found."
-	end
-end)
-
---// Highlight Utilities
-local function addHighlight(character)
-	if not character:FindFirstChild("Highlight") then
-		local hl = Instance.new("Highlight")
-		hl.Name = "Highlight"
-		hl.Adornee = character
-		hl.FillColor = Color3.new(0, 0, 0)
-		hl.OutlineColor = highlightColor
-		hl.Parent = character
-	end
-end
-
-local function removeHighlight(character)
-	if character and character:FindFirstChild("Highlight") then
-		character.Highlight:Destroy()
-	end
-end
-
---// Player List
-local function updatePlayerList()
-	playerList:ClearAllChildren()
-	layout.Parent = playerList
-
 	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character and getHRP(plr.Character) then
-			local button = Instance.new("TextButton")
-			button.Size = UDim2.new(1, 0, 0, 32)
-			button.Text = plr.Name
-			button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-			button.TextColor3 = Color3.fromRGB(255, 255, 255)
-			button.Parent = playerList
-
-			button.MouseButton1Click:Connect(function()
-				if targetPlayer then
-					removeHighlight(targetPlayer.Character)
-				end
+		if plr ~= player then
+			local btn = Instance.new("TextButton")
+			btn.Text = plr.Name
+			btn.Size = UDim2.new(1, 0, 0, 30)
+			btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.Parent = listFrame
+			btn.MouseButton1Click:Connect(function()
+				if targetPlayer then removeHighlight(targetPlayer.Character) end
 				targetPlayer = plr
 				addHighlight(plr.Character)
+				statusLabel.Text = "Status: Selected " .. plr.Name
 			end)
 		end
 	end
 end
 
---// Lock-on Toggle
-local function setLockOn(state)
-	lockOnEnabled = state
-	toggleButton.Text = lockOnEnabled and "Toggle: ON" or "Toggle: OFF"
-end
-
-toggleButton.MouseButton1Click:Connect(function()
-	if targetPlayer then
-		setLockOn(not lockOnEnabled)
-	end
-end)
-
---// Main Facing Logic
-RunService.RenderStepped:Connect(function()
-	if (lockOnEnabled or hotkeyLockEnabled) and targetPlayer and targetPlayer.Character and getHRP(targetPlayer.Character) then
-		local myChar = player.Character
-		local myHRP = getHRP(myChar)
-		local targetHRP = getHRP(targetPlayer.Character)
-		if myHRP and targetHRP then
-			local lookPos = Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z)
-			myHRP.CFrame = CFrame.new(myHRP.Position, lookPos)
-			camera.CFrame = CFrame.new(camera.CFrame.Position, targetHRP.Position)
+searchButton.MouseButton1Click:Connect(function()
+	local name = searchBox.Text:lower()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Name:lower():sub(1, #name) == name then
+			if targetPlayer then removeHighlight(targetPlayer.Character) end
+			targetPlayer = plr
+			addHighlight(plr.Character)
+			statusLabel.Text = "Status: Selected by search: " .. plr.Name
+			return
 		end
 	end
+	statusLabel.Text = "Status: Player not found."
 end)
 
---// Hotkey Assignment
+refreshButton.MouseButton1Click:Connect(updatePlayerList)
+
 setHotkeyButton.MouseButton1Click:Connect(function()
 	awaitingHotkey = true
 	setHotkeyButton.Text = "Press a key..."
+end)
+
+setMinimizeHotkeyButton.MouseButton1Click:Connect(function()
+	awaitingMinimizeHotkey = true
+	setMinimizeHotkeyButton.Text = "Press a key..."
+end)
+
+toggleButton.MouseButton1Click:Connect(function()
+	if hotkeyLockEnabled then
+		statusLabel.Text = "Status: Cannot toggle while Hotkey Lock is active"
+		return
+	end
+
+	lockOnEnabled = not lockOnEnabled
+
+	if lockOnEnabled and not targetPlayer then
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= player and plr.Character and getHRP(plr.Character) then
+				targetPlayer = plr
+				addHighlight(plr.Character)
+				break
+			end
+		end
+	end
+
+	toggleButton.Text = lockOnEnabled and "Toggle: ON" or "Toggle: OFF"
+	statusLabel.Text = lockOnEnabled and "Status: Facing " .. (targetPlayer and targetPlayer.Name or "?") or "Status: Idle"
 end)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
@@ -249,45 +278,72 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 		return
 	end
 
+	if awaitingMinimizeHotkey and not gpe then
+		MINIMIZE_HOTKEY = input.KeyCode
+		minimizeHotkeyLabel.Text = "Minimize Hotkey: [" .. MINIMIZE_HOTKEY.Name .. "]"
+		setMinimizeHotkeyButton.Text = "Set Minimize Hotkey"
+		awaitingMinimizeHotkey = false
+		return
+	end
+
 	if not gpe and input.KeyCode == LOCK_HOTKEY then
-		local unitRay = camera:ScreenPointToRay(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-		local ray = Ray.new(unitRay.Origin, unitRay.Direction * 1000)
-		local part = workspace:FindPartOnRay(ray, player.Character)
-
-		if part then
-			local candidate = Players:GetPlayerFromCharacter(part:FindFirstAncestorOfClass("Model"))
-			if candidate then
-				if targetPlayer and candidate == targetPlayer and hotkeyLockEnabled then
-					removeHighlight(candidate.Character)
-					targetPlayer = nil
-					hotkeyLockEnabled = false
-					return
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= player and plr.Character and getHRP(plr.Character) then
+				local hrp = getHRP(plr.Character)
+				local dir = (hrp.Position - camera.CFrame.Position).Unit
+				local dot = dir:Dot(camera.CFrame.LookVector)
+				if dot > 0.95 then
+					if targetPlayer and targetPlayer == plr and hotkeyLockEnabled then
+						removeHighlight(plr.Character)
+						targetPlayer = nil
+						hotkeyLockEnabled = false
+						statusLabel.Text = "Status: Idle"
+					else
+						if targetPlayer then removeHighlight(targetPlayer.Character) end
+						targetPlayer = plr
+						addHighlight(plr.Character)
+						hotkeyLockEnabled = true
+						lockOnEnabled = false
+						statusLabel.Text = "Status: Locked via Hotkey: " .. plr.Name
+					end
+					break
 				end
-
-				if targetPlayer then
-					removeHighlight(targetPlayer.Character)
-				end
-				targetPlayer = candidate
-				addHighlight(candidate.Character)
-				hotkeyLockEnabled = true
-				setLockOn(false)
 			end
 		end
+	elseif not gpe and input.KeyCode == MINIMIZE_HOTKEY then
+		guiMinimized = not guiMinimized
+		window.Visible = not guiMinimized
 	end
 end)
 
---// Character Reset
+RunService.RenderStepped:Connect(function()
+	if (lockOnEnabled or hotkeyLockEnabled) and targetPlayer and targetPlayer.Character and getHRP(targetPlayer.Character) then
+		local myHRP = getHRP(player.Character)
+		local targetHRP = getHRP(targetPlayer.Character)
+		if myHRP and targetHRP then
+			myHRP.CFrame = CFrame.new(myHRP.Position, Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z))
+			camera.CFrame = CFrame.new(camera.CFrame.Position, targetHRP.Position)
+		end
+	else
+		if targetPlayer and targetPlayer.Character then
+			removeHighlight(targetPlayer.Character)
+		end
+		lockOnEnabled = false
+		hotkeyLockEnabled = false
+		targetPlayer = nil
+		toggleButton.Text = "Toggle: OFF"
+		statusLabel.Text = "Status: Idle"
+	end
+end)
+
 player.CharacterAdded:Connect(function()
+	targetPlayer = nil
 	lockOnEnabled = false
 	hotkeyLockEnabled = false
-	if targetPlayer and targetPlayer.Character then
-		removeHighlight(targetPlayer.Character)
-	end
-	targetPlayer = nil
+	statusLabel.Text = "Status: Idle"
 	updatePlayerList()
 end)
 
---// First Setup
 updatePlayerList()
 Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
