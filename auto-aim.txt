@@ -23,38 +23,52 @@ local awaitingHotkey = false
 
 --// UI Setup
 local gui = Instance.new("ScreenGui")
+
 gui.Name = "FaceLockGui"
 gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+
+player:WaitForChild("PlayerGui"):ClearAllChildren()
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 320, 0, 470)
 mainFrame.Position = UDim2.new(0.5, -160, 0.1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
+mainFrame.ZIndex = 10
 mainFrame.Parent = gui
 
 local tabButtonsFrame = Instance.new("Frame")
+tabButtonsFrame.Name = "TabButtons"
 tabButtonsFrame.Size = UDim2.new(1, 0, 0, 40)
 tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+tabButtonsFrame.ZIndex = 11
 tabButtonsFrame.Parent = mainFrame
 
 local contentFrame = Instance.new("Frame")
+contentFrame.Name = "ContentFrame"
 contentFrame.Size = UDim2.new(1, 0, 1, -40)
 contentFrame.Position = UDim2.new(0, 0, 0, 40)
 contentFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 contentFrame.ClipsDescendants = true
+contentFrame.ZIndex = 11
 contentFrame.Parent = mainFrame
 
 local playerTab = Instance.new("Frame")
+playerTab.Name = "PlayerTab"
 playerTab.Size = UDim2.new(1, 0, 1, 0)
 playerTab.BackgroundTransparency = 1
 playerTab.Visible = true
+playerTab.Visible = true
+playerTab.ZIndex = 12
 playerTab.Parent = contentFrame
 
 local playerList = Instance.new("ScrollingFrame")
+playerList.Name = "PlayerList"
 playerList.Size = UDim2.new(1, -20, 1, -80)
 playerList.Position = UDim2.new(0, 10, 0, 10)
 playerList.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
@@ -62,6 +76,7 @@ playerList.BorderSizePixel = 0
 playerList.ScrollBarThickness = 8
 playerList.CanvasSize = UDim2.new()
 playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playerList.ZIndex = 13
 playerList.Parent = playerTab
 
 local layout = Instance.new("UIListLayout")
