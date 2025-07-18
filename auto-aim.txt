@@ -13,79 +13,87 @@ local function getHRP(char)
 	return char and char:FindFirstChild("HumanoidRootPart")
 end
 
+--// Globals
 local lockOnEnabled = false
+local hotkeyLockEnabled = false
 local targetPlayer = nil
-local playersList = {}
-
 local highlightColor = Color3.fromRGB(255, 0, 0)
+local LOCK_HOTKEY = Enum.KeyCode.E
+local awaitingHotkey = false
 
---// GUI
+--// UI Setup
 local gui = Instance.new("ScreenGui")
-gui.Name = "FaceLockGui"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+gu.Name = "FaceLockGui"
+gu.ResetOnSpawn = false
+gu.Parent = player:WaitForChild("PlayerGui")
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 400)
-frame.Position = UDim2.new(0.5, -150, 0.1, 0)
-frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 320, 0, 470)
+mainFrame.Position = UDim2.new(0.5, -160, 0.1, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = gui
 
-local searchBox = Instance.new("TextBox")
-searchBox.Size = UDim2.new(1, -20, 0, 30)
-searchBox.Position = UDim2.new(0, 10, 0, 10)
-searchBox.PlaceholderText = "Type player name..."
-searchBox.Text = ""
-searchBox.Parent = frame
+local tabButtonsFrame = Instance.new("Frame")
+tabButtonsFrame.Size = UDim2.new(1, 0, 0, 40)
+tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+tabButtonsFrame.Parent = mainFrame
 
-local searchButton = Instance.new("TextButton")
-searchButton.Size = UDim2.new(1, -20, 0, 30)
-searchButton.Position = UDim2.new(0, 10, 0, 50)
-searchButton.Text = "Search"
-searchButton.Parent = frame
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, 0, 1, -40)
+contentFrame.Position = UDim2.new(0, 0, 0, 40)
+contentFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+contentFrame.ClipsDescendants = true
+contentFrame.Parent = mainFrame
 
-local playerListLabel = Instance.new("TextLabel")
-playerListLabel.Size = UDim2.new(1, -20, 0, 20)
-playerListLabel.Position = UDim2.new(0, 10, 0, 90)
-playerListLabel.Text = "Players:"
-playerListLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-playerListLabel.BackgroundTransparency = 1
-playerListLabel.TextXAlignment = Enum.TextXAlignment.Left
-playerListLabel.Parent = frame
+local playerTab = Instance.new("Frame")
+playerTab.Size = UDim2.new(1, 0, 1, 0)
+playerTab.BackgroundTransparency = 1
+playerTab.Visible = true
+playerTab.Parent = contentFrame
 
-local listFrame = Instance.new("ScrollingFrame")
-listFrame.Size = UDim2.new(1, -20, 0, 200)
-listFrame.Position = UDim2.new(0, 10, 0, 120)
-listFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-listFrame.ScrollBarThickness = 6
-listFrame.CanvasSize = UDim2.new()
-listFrame.ClipsDescendants = true
-listFrame.Parent = frame
+local playerList = Instance.new("ScrollingFrame")
+playerList.Size = UDim2.new(1, -20, 1, -80)
+playerList.Position = UDim2.new(0, 10, 0, 10)
+playerList.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+playerList.BorderSizePixel = 0
+playerList.ScrollBarThickness = 8
+playerList.CanvasSize = UDim2.new()
+playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playerList.Parent = playerTab
 
-local refreshButton = Instance.new("TextButton")
-refreshButton.Size = UDim2.new(0, 100, 0, 30)
-refreshButton.Position = UDim2.new(0, 10, 0, 340)
-refreshButton.Text = "Refresh"
-refreshButton.Parent = frame
+local layout = Instance.new("UIListLayout")
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0, 4)
+layout.Parent = playerList
 
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 180, 0, 30)
-toggleButton.Position = UDim2.new(0, 120, 0, 340)
+toggleButton.Size = UDim2.new(0, 100, 0, 32)
+toggleButton.Position = UDim2.new(0, 10, 1, -42)
 toggleButton.Text = "Toggle: OFF"
-toggleButton.Parent = frame
+toggleButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Parent = playerTab
 
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 20)
-statusLabel.Position = UDim2.new(0, 10, 0, 380)
-statusLabel.Text = "Status: Idle"
-statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-statusLabel.BackgroundTransparency = 1
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = frame
+local hotkeyLabel = Instance.new("TextLabel")
+hotkeyLabel.Size = UDim2.new(0, 100, 0, 32)
+hotkeyLabel.Position = UDim2.new(0, 120, 1, -42)
+hotkeyLabel.Text = "Hotkey: [E]"
+hotkeyLabel.BackgroundTransparency = 1
+hotkeyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+hotkeyLabel.Parent = playerTab
 
---// Highlight helpers
+local setHotkeyButton = Instance.new("TextButton")
+setHotkeyButton.Size = UDim2.new(0, 80, 0, 32)
+setHotkeyButton.Position = UDim2.new(0, 230, 1, -42)
+setHotkeyButton.Text = "Set Hotkey"
+setHotkeyButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+setHotkeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+setHotkeyButton.Parent = playerTab
+
+--// Highlight Utilities
 local function addHighlight(character)
 	if not character:FindFirstChild("Highlight") then
 		local hl = Instance.new("Highlight")
@@ -103,146 +111,111 @@ local function removeHighlight(character)
 	end
 end
 
---// Player list
-local function updatePlayersList()
-	playersList = {}
+--// Player List
+local function updatePlayerList()
+	playerList:ClearAllChildren()
+	layout.Parent = playerList
+
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= player and plr.Character and getHRP(plr.Character) then
-			table.insert(playersList, plr)
-		end
-	end
-end
-
-local function updateListUI()
-	listFrame:ClearAllChildren()
-
-	-- ✅ Always recreate the layout to avoid 'Parent locked' error
-	local layout = Instance.new("UIListLayout")
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 2)
-	layout.Parent = listFrame
-
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= player then
 			local button = Instance.new("TextButton")
-			button.Size = UDim2.new(1, 0, 0, 30)
+			button.Size = UDim2.new(1, 0, 0, 32)
 			button.Text = plr.Name
-			button.Parent = listFrame
+			button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			button.TextColor3 = Color3.fromRGB(255, 255, 255)
+			button.Parent = playerList
 
 			button.MouseButton1Click:Connect(function()
 				if targetPlayer then
 					removeHighlight(targetPlayer.Character)
 				end
 				targetPlayer = plr
-				addHighlight(targetPlayer.Character)
-				statusLabel.Text = "Status: Selected " .. plr.Name
+				addHighlight(plr.Character)
 			end)
 		end
 	end
-
-	listFrame.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 32)
 end
 
-refreshButton.MouseButton1Click:Connect(function()
-	updatePlayersList()
-	updateListUI()
-end)
-
-Players.PlayerAdded:Connect(function()
-	updatePlayersList()
-	updateListUI()
-end)
-
-Players.PlayerRemoving:Connect(function()
-	updatePlayersList()
-	updateListUI()
-end)
-
---// Search
-searchButton.MouseButton1Click:Connect(function()
-	local inputName = searchBox.Text:lower()
-	local found = false
-
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Name:lower():sub(1, #inputName) == inputName then
-			if targetPlayer then removeHighlight(targetPlayer.Character) end
-			targetPlayer = plr
-			addHighlight(targetPlayer.Character)
-			statusLabel.Text = "Status: Selected by search: " .. plr.Name
-			found = true
-			break
-		end
-	end
-
-	if not found then
-		statusLabel.Text = "Status: Player not found."
-	end
-end)
-
---// Toggle lock-on with CapsLock
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if not gameProcessed then
-		if input.KeyCode == Enum.KeyCode.CapsLock then
-			if not targetPlayer then
-				updatePlayersList()
-				targetPlayer = playersList[1]
-				if targetPlayer then
-					addHighlight(targetPlayer.Character)
-				end
-			end
-
-			lockOnEnabled = not lockOnEnabled
-			toggleButton.Text = lockOnEnabled and "Toggle: ON" or "Toggle: OFF"
-			statusLabel.Text = lockOnEnabled and "Status: Facing " .. (targetPlayer and targetPlayer.Name or "?") or "Status: Idle"
-		end
-	end
-end)
+--// Lock-on Toggle
+local function setLockOn(state)
+	lockOnEnabled = state
+	toggleButton.Text = lockOnEnabled and "Toggle: ON" or "Toggle: OFF"
+end
 
 toggleButton.MouseButton1Click:Connect(function()
-	lockOnEnabled = not lockOnEnabled
-	toggleButton.Text = lockOnEnabled and "Toggle: ON" or "Toggle: OFF"
-	statusLabel.Text = lockOnEnabled and "Status: Facing " .. (targetPlayer and targetPlayer.Name or "?") or "Status: Idle"
+	if targetPlayer then
+		setLockOn(not lockOnEnabled)
+	end
 end)
 
---// Main facing loop
+--// Main Facing Logic
 RunService.RenderStepped:Connect(function()
-	if lockOnEnabled and targetPlayer and targetPlayer.Character and getHRP(targetPlayer.Character) then
+	if (lockOnEnabled or hotkeyLockEnabled) and targetPlayer and targetPlayer.Character and getHRP(targetPlayer.Character) then
 		local myChar = player.Character
 		local myHRP = getHRP(myChar)
 		local targetHRP = getHRP(targetPlayer.Character)
-
 		if myHRP and targetHRP then
-			-- Face your character (Y-axis only)
 			local lookPos = Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z)
 			myHRP.CFrame = CFrame.new(myHRP.Position, lookPos)
-
-			-- Face your camera
-			local camPos = camera.CFrame.Position
-			camera.CFrame = CFrame.new(camPos, targetHRP.Position)
+			camera.CFrame = CFrame.new(camera.CFrame.Position, targetHRP.Position)
 		end
-	elseif lockOnEnabled then
-		-- Lost target, stop lock-on
-		if targetPlayer and targetPlayer.Character then
-			removeHighlight(targetPlayer.Character)
-		end
-		lockOnEnabled = false
-		targetPlayer = nil
-		toggleButton.Text = "Toggle: OFF"
-		statusLabel.Text = "Status: Idle"
 	end
 end)
 
---// Reset on character respawn
+--// Hotkey Assignment
+setHotkeyButton.MouseButton1Click:Connect(function()
+	awaitingHotkey = true
+	setHotkeyButton.Text = "Press a key..."
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if awaitingHotkey and not gpe then
+		LOCK_HOTKEY = input.KeyCode
+		hotkeyLabel.Text = "Hotkey: [" .. LOCK_HOTKEY.Name .. "]"
+		setHotkeyButton.Text = "Set Hotkey"
+		awaitingHotkey = false
+		return
+	end
+
+	if not gpe and input.KeyCode == LOCK_HOTKEY then
+		local unitRay = camera:ScreenPointToRay(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+		local ray = Ray.new(unitRay.Origin, unitRay.Direction * 1000)
+		local part = workspace:FindPartOnRay(ray, player.Character)
+
+		if part then
+			local candidate = Players:GetPlayerFromCharacter(part:FindFirstAncestorOfClass("Model"))
+			if candidate then
+				if targetPlayer and candidate == targetPlayer and hotkeyLockEnabled then
+					removeHighlight(candidate.Character)
+					targetPlayer = nil
+					hotkeyLockEnabled = false
+					return
+				end
+
+				if targetPlayer then
+					removeHighlight(targetPlayer.Character)
+				end
+				targetPlayer = candidate
+				addHighlight(candidate.Character)
+				hotkeyLockEnabled = true
+				setLockOn(false)
+			end
+		end
+	end
+end)
+
+--// Character Reset
 player.CharacterAdded:Connect(function()
 	lockOnEnabled = false
+	hotkeyLockEnabled = false
 	if targetPlayer and targetPlayer.Character then
 		removeHighlight(targetPlayer.Character)
 	end
 	targetPlayer = nil
-	playersList = {}
-	updateListUI()
+	updatePlayerList()
 end)
 
---// First build
-updatePlayersList()
-updateListUI()
+--// First Setup
+updatePlayerList()
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
