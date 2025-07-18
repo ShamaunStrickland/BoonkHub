@@ -71,7 +71,7 @@ playerTab.Parent = contentFrame
 
 local playerList = Instance.new("ScrollingFrame")
 playerList.Name = "PlayerList"
-playerList.Size = UDim2.new(1, -20, 1, -80)
+playerList.Size = UDim2.new(1, -20, 1, -120)
 playerList.Position = UDim2.new(0, 10, 0, 10)
 playerList.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 playerList.BorderSizePixel = 0
@@ -92,6 +92,8 @@ toggleButton.Position = UDim2.new(0, 10, 1, -42)
 toggleButton.Text = "Toggle: OFF"
 toggleButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.ZIndex = 14
+toggleButton.Visible = true
 toggleButton.Parent = playerTab
 
 local hotkeyLabel = Instance.new("TextLabel")
@@ -100,6 +102,8 @@ hotkeyLabel.Position = UDim2.new(0, 120, 1, -42)
 hotkeyLabel.Text = "Hotkey: [E]"
 hotkeyLabel.BackgroundTransparency = 1
 hotkeyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+hotkeyLabel.ZIndex = 14
+hotkeyLabel.Visible = true
 hotkeyLabel.Parent = playerTab
 
 local setHotkeyButton = Instance.new("TextButton")
@@ -108,6 +112,8 @@ setHotkeyButton.Position = UDim2.new(0, 230, 1, -42)
 setHotkeyButton.Text = "Set Hotkey"
 setHotkeyButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 setHotkeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+setHotkeyButton.ZIndex = 14
+setHotkeyButton.Visible = true
 setHotkeyButton.Parent = playerTab
 
 --// Highlight Utilities
