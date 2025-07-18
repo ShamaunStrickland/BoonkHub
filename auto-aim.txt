@@ -88,7 +88,7 @@ layout.Parent = playerList
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 100, 0, 32)
-toggleButton.Position = UDim2.new(0, 10, 1, -42)
+toggleButton.Position = UDim2.new(0, 10, 0, 340)
 toggleButton.Text = "Toggle: OFF"
 toggleButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -98,7 +98,7 @@ toggleButton.Parent = playerTab
 
 local hotkeyLabel = Instance.new("TextLabel")
 hotkeyLabel.Size = UDim2.new(0, 100, 0, 32)
-hotkeyLabel.Position = UDim2.new(0, 120, 1, -42)
+hotkeyLabel.Position = UDim2.new(0, 120, 0, 340)
 hotkeyLabel.Text = "Hotkey: [E]"
 hotkeyLabel.BackgroundTransparency = 1
 hotkeyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -108,13 +108,62 @@ hotkeyLabel.Parent = playerTab
 
 local setHotkeyButton = Instance.new("TextButton")
 setHotkeyButton.Size = UDim2.new(0, 80, 0, 32)
-setHotkeyButton.Position = UDim2.new(0, 230, 1, -42)
+setHotkeyButton.Position = UDim2.new(0, 230, 0, 340)
 setHotkeyButton.Text = "Set Hotkey"
 setHotkeyButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 setHotkeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 setHotkeyButton.ZIndex = 14
 setHotkeyButton.Visible = true
 setHotkeyButton.Parent = playerTab
+
+--// Search & Status
+
+local searchBox = Instance.new("TextBox")
+searchBox.Size = UDim2.new(1, -20, 0, 30)
+searchBox.Position = UDim2.new(0, 10, 0, 10)
+searchBox.PlaceholderText = "Type player name..."
+searchBox.Text = ""
+searchBox.ZIndex = 14
+searchBox.Parent = playerTab
+
+local searchButton = Instance.new("TextButton")
+searchButton.Size = UDim2.new(1, -20, 0, 30)
+searchButton.Position = UDim2.new(0, 10, 0, 50)
+searchButton.Text = "Search"
+searchButton.ZIndex = 14
+searchButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+searchButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+searchButton.Parent = playerTab
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Position = UDim2.new(0, 10, 0, 90)
+statusLabel.Text = "Status: Idle"
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.ZIndex = 14
+statusLabel.Parent = playerTab
+
+searchButton.MouseButton1Click:Connect(function()
+	local inputName = searchBox.Text:lower()
+	local found = false
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Name:lower():sub(1, #inputName) == inputName then
+			if targetPlayer then removeHighlight(targetPlayer.Character) end
+			targetPlayer = plr
+			addHighlight(plr.Character)
+			statusLabel.Text = "Status: Selected by search: " .. plr.Name
+			found = true
+			break
+		end
+	end
+
+	if not found then
+		statusLabel.Text = "Status: Player not found."
+	end
+end)
 
 --// Highlight Utilities
 local function addHighlight(character)
