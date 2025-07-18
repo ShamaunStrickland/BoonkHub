@@ -23,7 +23,7 @@ local awaitingHotkey = false
 
 --// UI Setup
 local gui = Instance.new("ScreenGui")
-gui.Name = "FaceLockGui""FaceLockGui"
+gui.Name = "FaceLockGui"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
